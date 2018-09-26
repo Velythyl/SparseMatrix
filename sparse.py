@@ -4,6 +4,9 @@ Matricule: 20105623
 Date: septembre 25 2015
 """
 
+# Note: j'utilise le duck typing pour verifier le type des arguments et pour verifier si l'appel de fonction est valide
+# 
+
 
 class SparseMatrix:
     def __init__(self, fromiter, shape):
@@ -47,7 +50,11 @@ class SparseMatrix:
                 # Assigner le nouveau row a last_row
                 # Remettre nb_on_row a 0. Mais! Ce triplet existe, donc on a pour sur au moins un element sur le row.
                 #  Donc, on assigne 1 a nb_on_row.
+                # De plus, on doit sauvegarder les rows nuls. Donc, on ajoute les valeurs de row jusqu'au row depuis le dernier row
 
+                for x in range(last_row, triplet[0]):   # On ajoute des intervalles vides pour les row entre last_row et le row precedent
+                    self.rowptr.append(self.rowptr[-1])
+                    
                 self.rowptr.append(self.rowptr[-1] + nb_on_row)     # On ajoute le rowptr du row precedent
 
                 last_row = triplet[0]   # On prend la valeur du nouveau row
