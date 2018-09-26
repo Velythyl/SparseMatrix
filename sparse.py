@@ -4,19 +4,20 @@ Matricule: 20105623
 Date: septembre 25 2015
 """
 
-# Note: j'utilise le duck typing pour verifier le type des arguments et pour verifier si l'appel de fonction est valide
-# 
 
+# Note: j'utilise le duck typing pour verifier le type des arguments et pour verifier si l'appel de fonction est valide
 
 class SparseMatrix:
     def __init__(self, fromiter, shape):
         try:
             n, m = shape
             temp = iter(fromiter)
+            if len(fromiter) != 3: raise Exception
         except Exception:
             # mauvais types de fromiter ou shape
-            return None
-            
+            return
+
+
         self.n = n
         self.m = m
 
@@ -25,13 +26,15 @@ class SparseMatrix:
         self.colind = []  # liste de taille nnz des indices des valeurs non-nulles
         self.data = []  # liste de taille nnz des valeurs non-nulles
 
-        triplets = fromiter.sorted()  # on sait que les triplets sont en ordre de rangee maintenant
+        fromiter.sort()  # on sait que les triplets sont en ordre de rangee maintenant
 
         self.rowptr.append(0)
         nb_on_row = 0
-        last_row = 0
+        last_row = fromiter[0][0]
+        for x in range(0, last_row):
+            self.rowptr.append(0)
 
-        for triplet in triplets:
+        for triplet in fromiter:
             # Peu importe ce qui se passe, on sait que chaque triplet n'est pas 0.
             # Donc, on ajoute triplet[1] et triplet[2] a colind et data (respectivement) peu importe la valeur
             #  de triplet[0]
@@ -52,30 +55,41 @@ class SparseMatrix:
                 #  Donc, on assigne 1 a nb_on_row.
                 # De plus, on doit sauvegarder les rows nuls. Donc, on ajoute les valeurs de row jusqu'au row depuis le dernier row
 
-                for x in range(last_row, triplet[0]):   # On ajoute des intervalles vides pour les row entre last_row et le row precedent
+                self.rowptr.append(self.rowptr[-1] + nb_on_row)  # On ajoute le rowptr du row precedent
+
+                for x in range(last_row+1, triplet[0]):   # On ajoute des intervalles vides pour les row entre last_row et
+                                                        #  le row precedent
                     self.rowptr.append(self.rowptr[-1])
-                    
-                self.rowptr.append(self.rowptr[-1] + nb_on_row)     # On ajoute le rowptr du row precedent
 
-                last_row = triplet[0]   # On prend la valeur du nouveau row
-                nb_on_row = 1           # On sait qu'il y a au moins ce triplet comme valaur non-nulle sur ce row
+                last_row = triplet[0]  # On prend la valeur du nouveau row
+                nb_on_row = 1  # On sait qu'il y a au moins ce triplet comme valaur non-nulle sur ce row
 
-    def __getitem__(self, k):       # TODO donc seulement retourner la diagonale? Devrait pas etre k, i? pour k ieme ele sur ligne i
-                                    # TODO ou i, j? ou k = tuple
-                                    # TODO ou k, et on trouve le k ieme element sans prendre i, j=k?
+        self.rowptr.append(self.rowptr[-1] + nb_on_row)
+
+    def __getitem__(self, k):
         try:
-            i, j = k # TODO: retourner la valeur correspondant à l'indice (i, j)
+            i, j = k  # TODO: retourner la valeur correspondant à l'indice (i, j)
         except Exception:
             # k n'est pas un tuple
             return None
-        
+
         try:
-            return data[self.rowptr[i]+j]
+            return self.data[self.rowptr[i] + j]
         except Exception:
             # j trop grand pour i
             # ou i trop grand pour rowptr
-            return None
-            
+            return 0
+
     def todense(self):
         # TODO: encoder la matrice en format dense TODO Numpy array? 2d list? triples et shape?
         pass
+
+
+print("\n")
+mat = SparseMatrix(fromiter=[(1, 0, 1), (1, 1, 30), (1, 3, 40), (2, 2, 50), (2, 3, 60), (2, 4, 70), (3, 5, 80)], shape=(4, 6))
+print(mat.m)
+print(mat.n)
+print(mat.nnz)
+print(mat.rowptr)
+print(mat.colind)
+print(mat.data)
