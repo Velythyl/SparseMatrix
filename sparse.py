@@ -54,5 +54,5 @@ class SparseMatrix:
         # TODO: retourner la valeur correspondant à l'indice (i, j)
 
     def todense(self):
-        # TODO: encoder la matrice en format dense
+        # TODO: encoder la matrice en format dense TODO Numpy array? 2d list? triples et shape?
         pass
