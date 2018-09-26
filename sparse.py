@@ -83,7 +83,7 @@ class SparseMatrix:
     # Retourne l'item aux coordonnees du tuple k
     def __getitem__(self, k):
         try:
-            i, j = k  # TODO: retourner la valeur correspondant à l'indice (i, j)
+            i, j = k
         except Exception:
             # k n'est pas un tuple
             return None
