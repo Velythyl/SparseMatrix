@@ -7,7 +7,13 @@ Date: septembre 25 2015
 
 class SparseMatrix:
     def __init__(self, fromiter, shape):
-        n, m = shape
+        try:
+            n, m = shape
+            temp = iter(fromiter)
+        except Exception:
+            # mauvais types de fromiter ou shape
+            return None
+            
         self.n = n
         self.m = m
 
@@ -50,9 +56,19 @@ class SparseMatrix:
     def __getitem__(self, k):       # TODO donc seulement retourner la diagonale? Devrait pas etre k, i? pour k ieme ele sur ligne i
                                     # TODO ou i, j? ou k = tuple
                                     # TODO ou k, et on trouve le k ieme element sans prendre i, j=k?
-        i, j = k
-        # TODO: retourner la valeur correspondant à l'indice (i, j)
-
+        try:
+            i, j = k # TODO: retourner la valeur correspondant à l'indice (i, j)
+        except Exception:
+            # k n'est pas un tuple
+            return None
+        
+        try:
+            return data[self.rowptr[i]+j]
+        except Exception:
+            # j trop grand pour i
+            # ou i trop grand pour rowptr
+            return None
+            
     def todense(self):
         # TODO: encoder la matrice en format dense TODO Numpy array? 2d list? triples et shape?
         pass
