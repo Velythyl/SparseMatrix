@@ -48,7 +48,7 @@ class SparseMatrix:
                 nb_on_row = 1           # On sait qu'il y a au moins ce triplet comme valaur non-nulle sur ce row
 
     def __getitem__(self, k):       # TODO donc seulement retourner la diagonale? Devrait pas etre k, i? pour k ieme ele sur ligne i
-                                    # TODO ou i, j?
+                                    # TODO ou i, j? ou k = tuple
                                     # TODO ou k, et on trouve le k ieme element sans prendre i, j=k?
         i, j = k
         # TODO: retourner la valeur correspondant à l'indice (i, j)
