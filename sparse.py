@@ -122,10 +122,9 @@ class SparseMatrix:
 
         return matrix   # retourne la matrice dense
 
-
+"""
 print("\n")
-sparse = SparseMatrix(fromiter=[(1, 0, 1), (1, 1, 30), (1, 3, 40), (2, 2, 50), (2, 3, 60), (2, 4, 70), (3, 5, 80)],
-                      shape=(4, 6))
+sparse = SparseMatrix([(1, 0, 1), (1, 1, 30), (1, 3, 40), (2, 2, 50), (2, 3, 60), (2, 4, 70), (3, 5, 80)], (4, 6))
 print(sparse.m)
 print(sparse.n)
 print(sparse.nnz)
@@ -135,12 +134,11 @@ print(sparse.data)
 print(sparse.todense())
 
 print("\n")
-sparse = SparseMatrix(fromiter=[(0, 1, 1), (1, 0, 2), (2, 1, 4), (2, 2, 3)],
-                      shape=(3, 3))
+sparse = SparseMatrix([(0, 1, 1), (1, 0, 2), (2, 1, 4), (2, 2, 3)], (3, 3))
 print(sparse.m)
 print(sparse.n)
 print(sparse.nnz)
 print(sparse.rowptr)
 print(sparse.colind)
 print(sparse.data)
-print(sparse.todense())
+print(sparse.todense())"""
