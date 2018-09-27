@@ -142,3 +142,17 @@ print(sparse.rowptr)
 print(sparse.colind)
 print(sparse.data)
 print(sparse.todense())"""
+
+
+class SparseTensor:
+
+    def __init__(self):
+        pass
+
+    def __getitem__(self, k):
+        pass
+
+    def todense(self):
+        pass
+
+
