@@ -46,7 +46,7 @@ class SparseMatrix:
         fill_blank(0, last_row)  # on met des intervalles vides jusqu'au premier row non-nul
 
         for triplet in fromiter:
-            # Peu importe ce qui se passe, on sait que chaque triplet n'est pas 0.
+            # Peu importe ce qui se passe, on sait que chaque triplet n'est pas nul
             # Donc, on ajoute triplet[1] et triplet[2] a colind et data (respectivement) peu importe la valeur
             # de triplet[0]
 
@@ -89,14 +89,13 @@ class SparseMatrix:
             return None
 
         try:
-            return self.data[self.rowptr[i] + j]
+            return self.data[self.rowptr[i] + j]    # On retourne la valeur dans l'intervalle i, indice j
         except Exception:
             # Le couple n'est pas dans nos valeurs non-nulles
-
             if i <= self.n and j <= self.m:     # Si le couple est dans la matrice
-                return 0                        # valeur nulle
+                return 0                        # Retourne valeur nulle
             else:                               # Sinon
-                return None                     # valeur hors-matrice None
+                return None                     # valeur hors-matrice: None
 
     # Retourne une matrice dense tiree de l'encodage de Yale de l'objet
     def todense(self):
@@ -105,10 +104,10 @@ class SparseMatrix:
 
         # Pour chaque rangee
         for i in range(self.n):
-            pointer = self.rowptr[i]                    # On prend le pointer du row
-            nb_non_nul = self.rowptr[i+1] - pointer    # On prend la grosseur de l'interalle
+            pointer = self.rowptr[i]  # On prend le pointer du row
+            nb_non_nul = self.rowptr[i + 1] - pointer  # On prend la grosseur de l'interalle
 
-            if nb_non_nul == 0:    # Si l'intervalle est vide, on passe a la prochaine rangee
+            if nb_non_nul == 0:  # Si l'intervalle est vide, on passe a la prochaine rangee
                 continue
 
             # Si l'interval n'est pas vide, on parcours les points non-nuls (colind, data) du row et on assigne dans
@@ -118,9 +117,10 @@ class SparseMatrix:
             # pointer+counter: counter s'incremente nb_non_nul fois. En y ajoutant son pointeur, on retrouve l'indice
             # des j et des data correspondant
             for counter in range(nb_non_nul):
-                matrix[i][self.colind[pointer+counter]] = self.data[pointer+counter]
+                matrix[i][self.colind[pointer + counter]] = self.data[pointer + counter]
 
-        return matrix   # retourne la matrice dense
+        return matrix  # retourne la matrice dense
+
 
 """
 print("\n")
@@ -141,8 +141,6 @@ print(sparse.rowptr)
 print(sparse.colind)
 print(sparse.data)
 print(sparse.todense())"""
-
-import gc
 
 
 class SparseTensor:
@@ -171,6 +169,7 @@ class SparseTensor:
         def add_ptr():
             self.rowptr.append(self.rowptr[-1] + nb_on_row)
 
+        # Un pointeur de profondeur est toujours de n elements (on pointe sur tous les intervalles de la prof.)
         def add_ptr_prof():
             self.profptr.append(self.profptr[-1] + self.n)
 
@@ -179,25 +178,24 @@ class SparseTensor:
         self.o = o  # profondeur
 
         self.nnz = len(fromiter)  # le nombre de valeur non-nulles = le nombre de triplets
-        self.profptr = [] # liste de taille o + 1 des intervalles des rangees (donc prof)
-        self.rowptr = []    # liste de taille n + 1 des intervalles des colonnes
+        self.profptr = []  # liste de taille o + 1 des intervalles des rangees (donc prof)
+        self.rowptr = []  # liste de taille n + 1 des intervalles des colonnes
         self.colind = []  # liste de taille nnz des indices des valeurs non-nulles
         self.data = []  # liste de taille nnz des valeurs non-nulles
 
-        fromiter.sort()  # on sait que les triplets sont en ordre des rangee maintenant
+        fromiter.sort()  # on sait que les quads sont en ordre des profondeurs maintenant
 
         nb_on_row = 0  # en ce moment, il n'y a rien sur le row
-        last_prof = fromiter[0][0]  # et le "premier" last_row est le i du premier quad
-        last_row = fromiter[0][1]
+        last_prof = fromiter[0][0]  # et le "premier" last_prof est le k du premier quad
+        last_row = fromiter[0][1]  # et le "premier" last_row est le i du premier quad
 
         self.rowptr.append(0)  # rowptr commence toujours par 0
-        self.profptr.append(0)
-        fill_blank_prof(0, last_prof)    # profondeurs vides
-        fill_blank(0, last_row)     # on met des intervalles vides jusqu'au premier row non-nul
+        self.profptr.append(0)  # de meme pour profptr
+        fill_blank_prof(0, last_prof)  # on met des intervalles vides jusqu'a la premiere profondeur non-vides
+        fill_blank(0, last_row)  # on met des intervalles vides jusqu'au premier row non-nul
 
         for quad in fromiter:
-
-            # Peu importe ce qui se passe, on sait que chaque quad n'est pas 0.
+            # Peu importe ce qui se passe, on sait que chaque quad n'est pas nul
             # Donc, on ajoute quad[2] et quad[3] a colind et data (respectivement) peu importe la valeur
             # de quad[0] et [1]
 
@@ -205,8 +203,10 @@ class SparseTensor:
             self.data.append(quad[3])  # On ajoute la valeur de l'element a data
 
             if last_prof == quad[0]:
+                # Si on est sur la meme profondeurs
 
                 if last_row == quad[1]:
+                    # Et le meme row: on a une valeur de plus sur le row
                     nb_on_row += 1
 
                 else:
@@ -227,23 +227,24 @@ class SparseTensor:
                     nb_on_row = 1  # On sait qu'il y a au moins ce quad comme valaur non-nulle sur ce row
 
             else:
-                add_ptr()   # Ajout pointeur row (qui vient d'autre prof) precedent
+                # Sinon, on change de profondeur
+                # On doit finaliser le row, puis changer de profondeur
 
-                fill_blank(last_row + 1, self.n)   # Remplir le reste du row
+                add_ptr()  # Ajout pointeur row (qui vient d'autre prof) precedent
 
+                fill_blank(last_row + 1, self.n)  # Remplir le reste du row
 
-                last_prof = quad[0]
-                last_row = quad[1]
+                last_prof = quad[0]  # Changer de profondeur
+                last_row = quad[1]  # Change de row
 
-                fill_blank(0, last_row)  # Remplir le reste du row sur nouveau prof
+                fill_blank(0, last_row)  # Remplir le reste du row sur la nouvelle prof.
 
-                add_ptr_prof()
-                fill_blank_prof(last_prof + 1, quad[0])  # Remplir les intervalles vides de profondeurs
+                add_ptr_prof()  # Ajouter le pointeur pour cette profondeur non-nulle precendente
+                fill_blank_prof(last_prof + 1, quad[0])  # Remplir les intervalles vides des profondeurs
 
-                nb_on_row = 1
+                nb_on_row = 1  # Ce quad est une valeur non-nulle
 
-                #gc.collect()
-            quad = None
+            quad = None  # Liberer de la memoire
 
         # On n'ajoute pas l'intervalle du dernier row a rowptr: add_ptr est appele lorsqu'on change de row.
         # Donc, on l'ajoute ici. nb_on_row est ici correct: on l'a calcule dans la boucle
@@ -259,19 +260,19 @@ class SparseTensor:
         try:
             i, j, k = triple
         except Exception:
-            # triple n'est pas un triple
+            # triple n'est pas un triple (donc coordonnee pas valide)
             return None
 
         try:
-            return self.data[self.rowptr[i] + j + self.profptr[k]]
+            # On retourne la valeur prise de l'intervalle de rowptr lui-meme pris de l'intervalle de profptr,
+            # a l'indice j
+            return self.data[self.rowptr[i + self.profptr[k]] + j]
         except Exception:
             # Le couple n'est pas dans nos valeurs non-nulles
-
-            if i <= self.n and j <= self.m and k <= self.o:     # Si le couple est dans la matrice
-                return 0                        # valeur nulle
-            else:                               # Sinon
-                return None                     # valeur hors-matrice None
-
+            if i <= self.n and j <= self.m and k <= self.o:  # Si le couple est dans la matrice
+                return 0  # valeur nulle
+            else:  # Sinon
+                return None  # valeur hors-matrice: None
 
     def todense(self):
         # On cree une matrice de 0 du bon format
@@ -279,14 +280,14 @@ class SparseTensor:
 
         # Pour chaque profondeur
         for k in range(self.o):
-            if self.profptr[k] == self.profptr[k]+1:    # prof vide
+            if self.profptr[k] == self.profptr[k] + 1:  # prof vide
                 continue
 
             # Profondeur pas vide
             # Pour chaque rangee
             for i in range(self.n):
-                pointer = self.rowptr[i+self.profptr[k]]  # On prend le pointer du row
-                nb_non_nul = self.rowptr[i+self.profptr[k] + 1]
+                pointer = self.rowptr[i + self.profptr[k]]  # On prend le pointer du row
+                nb_non_nul = self.rowptr[i + self.profptr[k] + 1]
                 nb_non_nul -= pointer  # On prend la grosseur de l'interalle
 
                 if nb_non_nul == 0:  # Si l'intervalle est vide, on passe a la prochaine rangee
