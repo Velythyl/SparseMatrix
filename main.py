@@ -62,7 +62,7 @@ def bitmap_to_tensor(bitmap, shape):
 try:
     tridbitmap = mnist_dataset.tolist()
 
-    prof = 10
+    prof = 10   # Pas assez de ram pour faire les 60 000
 
     tridbitmap = tridbitmap[:prof]
 
