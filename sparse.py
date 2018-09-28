@@ -132,7 +132,6 @@ print(sparse.rowptr)
 print(sparse.colind)
 print(sparse.data)
 print(sparse.todense())
-
 print("\n")
 sparse = SparseMatrix([(0, 1, 1), (1, 0, 2), (2, 1, 4), (2, 2, 3)], (3, 3))
 print(sparse.m)
@@ -143,12 +142,14 @@ print(sparse.colind)
 print(sparse.data)
 print(sparse.todense())"""
 
+import gc
+
 
 class SparseTensor:
 
     def __init__(self, fromiter, shape):
         try:
-            n, m, o = shape
+            o, n, m = shape
             temp = iter(fromiter)
             if len(fromiter[0]) != 4:
                 raise Exception
@@ -171,7 +172,7 @@ class SparseTensor:
             self.rowptr.append(self.rowptr[-1] + nb_on_row)
 
         def add_ptr_prof():
-            self.profptr.append(self.profptr[-1] + nb_on_prof)
+            self.profptr.append(self.profptr[-1] + self.n)
 
         self.n = n  # hauteur
         self.m = m  # largeur
@@ -186,7 +187,6 @@ class SparseTensor:
         fromiter.sort()  # on sait que les triplets sont en ordre des rangee maintenant
 
         nb_on_row = 0  # en ce moment, il n'y a rien sur le row
-        nb_on_prof = 0
         last_prof = fromiter[0][0]  # et le "premier" last_row est le i du premier quad
         last_row = fromiter[0][1]
 
@@ -196,6 +196,7 @@ class SparseTensor:
         fill_blank(0, last_row)     # on met des intervalles vides jusqu'au premier row non-nul
 
         for quad in fromiter:
+
             # Peu importe ce qui se passe, on sait que chaque quad n'est pas 0.
             # Donc, on ajoute quad[2] et quad[3] a colind et data (respectivement) peu importe la valeur
             # de quad[0] et [1]
@@ -204,8 +205,6 @@ class SparseTensor:
             self.data.append(quad[3])  # On ajoute la valeur de l'element a data
 
             if last_prof == quad[0]:
-                # Si on est sur la meme prof que le dernier quad:
-                nb_on_prof += 1
 
                 if last_row == quad[1]:
                     nb_on_row += 1
@@ -217,6 +216,8 @@ class SparseTensor:
                     # On assign le row present a last_row
                     # On assigne 1 a last_row puisque le quad present est lui-meme une valeur non-nulle
 
+                    # Si on est sur la meme prof que le dernier quad:
+
                     add_ptr()  # On ajoute le rowptr du row precedent
 
                     # On ajoute des intervalles vides pour les row entre last_row et le row precedent
@@ -227,16 +228,22 @@ class SparseTensor:
 
             else:
                 add_ptr()   # Ajout pointeur row (qui vient d'autre prof) precedent
-                add_ptr_prof()
 
                 fill_blank(last_row + 1, self.n)   # Remplir le reste du row
-                fill_blank_prof(last_prof+1, quad[0])     # Remplir les intervalles vides de profondeurs
+
 
                 last_prof = quad[0]
                 last_row = quad[1]
 
+                fill_blank(0, last_row)  # Remplir le reste du row sur nouveau prof
+
+                add_ptr_prof()
+                fill_blank_prof(last_prof + 1, quad[0])  # Remplir les intervalles vides de profondeurs
+
                 nb_on_row = 1
-                nb_on_prof = 1
+
+                #gc.collect()
+            quad = None
 
         # On n'ajoute pas l'intervalle du dernier row a rowptr: add_ptr est appele lorsqu'on change de row.
         # Donc, on l'ajoute ici. nb_on_row est ici correct: on l'a calcule dans la boucle
@@ -246,7 +253,7 @@ class SparseTensor:
         # On met des intervalles vides pour les rows plus grands que le dernier row non-nul
         # last_row est lui aussi valide, pour la meme raison que nb_on_row a l'instruction precedente.
         fill_blank(last_row + 1, self.n)
-        fill_blank_prof(last_prof, self.o)
+        fill_blank_prof(last_prof + 1, self.o)
 
     def __getitem__(self, triple):
         try:
@@ -268,7 +275,7 @@ class SparseTensor:
 
     def todense(self):
         # On cree une matrice de 0 du bon format
-        matrix = [([0] * self.m for i in range(self.n)) for k in range(self.o)]
+        matrix = [[[0 for j in range(self.m)] for i in range(self.n)] for k in range(self.o)]
 
         # Pour chaque profondeur
         for k in range(self.o):
@@ -279,7 +286,8 @@ class SparseTensor:
             # Pour chaque rangee
             for i in range(self.n):
                 pointer = self.rowptr[i+self.profptr[k]]  # On prend le pointer du row
-                nb_non_nul = self.rowptr[i+self.rowptr[k] + 1] - pointer  # On prend la grosseur de l'interalle
+                nb_non_nul = self.rowptr[i+self.profptr[k] + 1]
+                nb_non_nul -= pointer  # On prend la grosseur de l'interalle
 
                 if nb_non_nul == 0:  # Si l'intervalle est vide, on passe a la prochaine rangee
                     continue
@@ -294,5 +302,3 @@ class SparseTensor:
                     matrix[k][i][self.colind[pointer + counter]] = self.data[pointer + counter]
 
         return matrix  # retourne la matrice dense
-
-
