@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import gc
 from sparse import *
 
 import sys
@@ -51,6 +52,8 @@ except AssertionError:
 sparse = None
 first_image = None
 
+gc.collect()
+
 # QUESTION 4 ....
 
 
@@ -68,16 +71,34 @@ def bitmap_to_quads(bitmap):
 
 # Retourne un SparseTensor a partir d'un set de bitmaps
 def bitmap_to_tensor(bitmap, shape):
-    return SparseTensor(bitmap_to_quads(bitmap), shape)
+    return VerySparseTensor(bitmap_to_quads(bitmap), shape)
 
 
 tridbitmap = mnist_dataset.tolist()
 
-prof = 10  # Pas assez de ram pour faire les 60 000
+# tridbitmap = tridbitmap[:10]  # Donc on prend une tranche des 60 000
 
-tridbitmap = tridbitmap[:prof]  # Donc on prend une tranche des 60 000
+quads = np.transpose(np.nonzero(tridbitmap))  # Prends les couples non-nuls et les agence en z, x, y
+quads = quads.tolist()  # On cast en une liste de listes
 
-tensortodense = bitmap_to_tensor(tridbitmap, (prof, 28, 28)).todense()
+for quad in quads:  # Pour chaque triplet de coordonnee
+    z, x, y = quad
+    quad.append(tridbitmap[z][x][y])  # On va chercher sa valeur et on lui ajoute
+
+mnist_dataset = None
+gc.collect()
+
+tensor = SparseTensor(quads, (60000, 28, 28))
+
+# print("nb of nb VerySparseTensor:", VerySparseTensor(quads, (60000, 28, 28)).get_nb_of_nb())
+print("nb of nb SparseTensor:", tensor.get_nb_of_nb())
+print("nb of nb tensor:", 60000*28*28)
+
+tensortodense = tensor.todense()
+
+tensor = None
+quads = None
+gc.collect()
 
 # Comparaison pixel par pixel
 try:
