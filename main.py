@@ -76,11 +76,9 @@ def bitmap_to_tensor(bitmap, shape):
 
 tridbitmap = mnist_dataset.tolist()
 
-# tridbitmap = tridbitmap[:10]  # Donc on prend une tranche des 60 000
+# tridbitmap = tridbitmap[:2]  # Donc on prend une tranche des 60 000
 
-quads = np.transpose(np.nonzero(tridbitmap))  # Prends les couples non-nuls et les agence en z, x, y
-quads = quads.tolist()  # On cast en une liste de listes
-
+quads = (np.transpose(np.nonzero(tridbitmap))).tolist()  # Prends les couples non-nuls et les agence en z, x, y
 for quad in quads:  # Pour chaque triplet de coordonnee
     z, x, y = quad
     quad.append(tridbitmap[z][x][y])  # On va chercher sa valeur et on lui ajoute
@@ -90,7 +88,7 @@ gc.collect()
 
 tensor = SparseTensor(quads, (60000, 28, 28))
 
-# print("nb of nb VerySparseTensor:", VerySparseTensor(quads, (60000, 28, 28)).get_nb_of_nb())
+print("nb of nb VerySparseTensor:", VerySparseTensor(quads, (60000, 28, 28)).get_nb_of_nb())
 print("nb of nb SparseTensor:", tensor.get_nb_of_nb())
 print("nb of nb tensor:", 60000*28*28)
 
