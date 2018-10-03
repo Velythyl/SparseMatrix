@@ -20,30 +20,24 @@ class SparseMatrix:
             # mauvais types de fromiter ou shape
             return
 
-        # fill_blank ajoute des intervalles vides pour les rows de lower a upper, inclus-exclus
-        def fill_blank(lower, upper):
-            for counter in range(lower, upper):
-                self.rowptr.append(self.rowptr[-1])
-
         # add_ptr ajoute un intervalle a rowptr d'apres la borne exclus de l'intervalle precedent
-        def add_ptr():
-            self.rowptr.append(self.rowptr[-1] + nb_on_row)
+        def add_ptr(lower, upper):
+            for counter in range(lower, upper):
+                self.rowptr.append(self.nnz)
 
         self.n = n  # hauteur
         self.m = m  # largeur
 
-        self.nnz = len(fromiter)  # le nombre de valeur non-nulles = le nombre de triplets
-        self.rowptr = []  # liste de taille n + 1 des intervalles des colonnes
+        self.nnz = 0  # le nombre de valeur non-nulles = le nombre de triplets, mais incremente dans boucle
+        self.rowptr = [0]  # liste de taille n + 1 des intervalles des colonnes
         self.colind = []  # liste de taille nnz des indices des valeurs non-nulles
         self.data = []  # liste de taille nnz des valeurs non-nulles
 
         fromiter.sort()  # on sait que les triplets sont en ordre des rangee maintenant
 
-        nb_on_row = 0  # en ce moment, il n'y a rien sur le row
         last_row = fromiter[0][0]  # et le "premier" last_row est le i du premier triplet
 
-        self.rowptr.append(0)  # rowptr commence toujours par 0
-        fill_blank(0, last_row)  # on met des intervalles vides jusqu'au premier row non-nul
+        add_ptr(0, last_row)  # on met des intervalles vides jusqu'au premier row non-nul
 
         for triplet in fromiter:
             # Peu importe ce qui se passe, on sait que chaque triplet n'est pas nul
@@ -53,32 +47,22 @@ class SparseMatrix:
             self.colind.append(triplet[1])  # On ajoute l'index de cet element au colind
             self.data.append(triplet[2])  # On ajoute la valeur de l'element a data
 
-            if last_row == triplet[0]:
-                # Si on est sur le meme row que le dernier triplet:
-                nb_on_row += 1  # On incremente simplement le nombre de valeurs sur le row
-
-            else:
+            if last_row != triplet[0]:
                 # Sinon, on doit assumer qu'on change de row
                 # On ajoute donc l'intervalle du row precendent (add_ptr)
                 # On ajoute des intervalles vides jusqu'au row present
                 # On assign le row present a last_row
                 # On assigne 1 a last_row puisque le triplet present est lui-meme une valeur non-nulle
 
-                add_ptr()  # On ajoute le rowptr du row precedent
-
-                # On ajoute des intervalles vides pour les row entre last_row et le row precedent
-                fill_blank(last_row + 1, triplet[0])
+                add_ptr(last_row, triplet[0])  # On ajoute le rowptr du row precedent
 
                 last_row = triplet[0]  # On prend la valeur du nouveau row
-                nb_on_row = 1  # On sait qu'il y a au moins ce triplet comme valaur non-nulle sur ce row
+
+            self.nnz += 1
 
         # On n'ajoute pas l'intervalle du dernier row a rowptr: add_ptr est appele lorsqu'on change de row.
         # Donc, on l'ajoute ici. nb_on_row est ici correct: on l'a calcule dans la boucle
-        add_ptr()
-
-        # On met des intervalles vides pour les rows plus grands que le dernier row non-nul
-        # last_row est lui aussi valide, pour la meme raison que nb_on_row a l'instruction precedente.
-        fill_blank(last_row + 1, self.n)
+        add_ptr(last_row, self.n)
 
     # Retourne l'item aux coordonnees du tuple k
     def __getitem__(self, k):
@@ -121,10 +105,9 @@ class SparseMatrix:
 
         return matrix  # retourne la matrice dense
 
-
 """
 print("\n")
-sparse = SparseMatrix([(1, 0, 1), (1, 1, 30), (1, 3, 40), (2, 2, 50), (2, 3, 60), (2, 4, 70), (3, 5, 80)], (4, 6))
+sparse = SparseMatrix([(0, 1, 1), (1, 0, 2), (2, 1, 4), (2, 2, 3)], (3, 3))
 print(sparse.m)
 print(sparse.n)
 print(sparse.nnz)
@@ -328,38 +311,25 @@ class SparseTensor:
             # mauvais types de fromiter ou shape
             return
 
-        # fill_blank ajoute des intervalles vides pour les rows de lower a upper, inclus-exclus
-        def fill_blank(lower, upper):
-            for counter in range(lower, upper):
-                self.rowptr.append(self.rowptr[-1])
-
-        # fill_blank_prof ajoute des intervalles vides a rowptr pour jusqu'a la fin de la profondeur
-        def fill_blank_prof():
-            while (len(self.rowptr) - 1) % 28 != 0:
-                self.rowptr.append(self.rowptr[-1])
-
         # add_ptr ajoute un intervalle a rowptr d'apres la borne exclus de l'intervalle precedent
-        def add_ptr():
-            self.rowptr.append(self.rowptr[-1] + nb_on_row)
+        def add_ptr(lower, upper):
+            for counter in range(lower, upper):
+                self.rowptr.append(self.nnz)
 
         self.n = n  # hauteur
         self.m = m  # largeur
         self.o = o  # profondeur
 
-        self.nnz = len(fromiter)  # le nombre de valeur non-nulles = le nombre de triplets
-        self.rowptr = []  # liste de taille n + 1 des intervalles des colonnes
+        self.nnz = 0  # le nombre de valeur non-nulles = le nombre de triplets
+        self.rowptr = [0]  # liste de taille n + 1 des intervalles des colonnes
         self.colind = []  # liste de taille nnz des indices des valeurs non-nulles
         self.data = []  # liste de taille nnz des valeurs non-nulles
 
         fromiter.sort()  # on sait que les quads sont en ordre des profondeurs maintenant
 
-        nb_on_row = 0  # en ce moment, il n'y a rien sur le row
-        last_prof = fromiter[0][0]  # et le "premier" last_prof est le k du premier quad
-        last_row = fromiter[0][1]  # et le "premier" last_row est le i du premier quad
+        last_ki = fromiter[0][0]*self.n + fromiter[0][1]  # et le "premier" last_prof est le k du premier quad
 
-        self.rowptr.append(0)  # rowptr commence toujours par 0
-        fill_blank(0, last_prof*self.n)
-        fill_blank(0, last_row)  # on met des intervalles vides jusqu'au premier row non-nul
+        add_ptr(0, last_ki)
 
         for quad in fromiter:
             # Peu importe ce qui se passe, on sait que chaque quad n'est pas nul
@@ -369,55 +339,28 @@ class SparseTensor:
             self.colind.append(quad[2])  # On ajoute l'index de cet element au colind
             self.data.append(quad[3])  # On ajoute la valeur de l'element a data
 
-            if last_prof == quad[0]:
-                # Si on est sur la meme profondeurs
+            temp_ki = quad[0]*self.n + quad[1]
+            if last_ki != temp_ki:
+                # Si on change de k*n+i
 
-                if last_row == quad[1]:
-                    # Et le meme row: on a une valeur de plus sur le row
-                    nb_on_row += 1
+                # On ajoute donc l'intervalle du row precendent (add_ptr)
+                # On ajoute des intervalles vides jusqu'au row present
+                # On assign le row present a last_row
+                # On assigne 1 a last_row puisque le quad present est lui-meme une valeur non-nulle
 
-                else:
-                    # Sinon, on doit assumer qu'on change de row
-                    # On ajoute donc l'intervalle du row precendent (add_ptr)
-                    # On ajoute des intervalles vides jusqu'au row present
-                    # On assign le row present a last_row
-                    # On assigne 1 a last_row puisque le quad present est lui-meme une valeur non-nulle
+                # Si on est sur la meme prof que le dernier quad:
 
-                    # Si on est sur la meme prof que le dernier quad:
+                add_ptr(last_ki, temp_ki)  # On ajoute le rowptr du row precedent
 
-                    add_ptr()  # On ajoute le rowptr du row precedent
+                last_ki = temp_ki  # On prend la valeur du nouveau row
 
-                    # On ajoute des intervalles vides pour les row entre last_row et le row precedent
-                    fill_blank(last_row + 1, quad[1])
-
-                    last_row = quad[1]  # On prend la valeur du nouveau row
-                    nb_on_row = 1  # On sait qu'il y a au moins ce quad comme valaur non-nulle sur ce row
-
-            else:
-                # Sinon, on change de profondeur
-                # On doit finaliser le row, puis changer de profondeur
-
-                add_ptr()  # Ajout pointeur row (qui vient d'autre prof) precedent
-
-                fill_blank_prof()  # Remplir le reste du row
-
-                last_prof = quad[0]  # Changer de profondeur
-                last_row = quad[1]  # Change de row
-
-                fill_blank(0, last_row)  # Remplir le reste du row sur la nouvelle prof.
-
-                nb_on_row = 1  # Ce quad est une valeur non-nulle
-
-            print(quad)
+            self.nnz += 1
             quad = None  # Liberer de la memoire
 
         # On n'ajoute pas l'intervalle du dernier row a rowptr: add_ptr est appele lorsqu'on change de row.
         # Donc, on l'ajoute ici. nb_on_row est ici correct: on l'a calcule dans la boucle
-        add_ptr()
-
-        # On met des intervalles vides pour les rows plus grands que le dernier row non-nul
-        # last_row est lui aussi valide, pour la meme raison que nb_on_row a l'instruction precedente.
-        fill_blank(last_row + 1, self.n+self.o+1)
+        add_ptr(last_ki, self.o*self.n+1)
+        pass
 
     def __getitem__(self, triple):
         try:
@@ -468,10 +411,8 @@ class SparseTensor:
         for ik in range(self.o * self.n):
             pointer = self.rowptr[ik]  # On prend le pointer du row
             nb_non_nul = self.rowptr[ik + 1] - pointer  # On prend la grosseur de l'interalle
-
             if nb_non_nul == 0:  # Si l'intervalle est vide, on passe a la prochaine rangee
                 continue
-
             # Si l'interval n'est pas vide, on parcours les points non-nuls (colind, data) du row et on assigne dans
             # la matrice a l'emplacement i (pris de la boucle englobante), j (pris de colind) l'item correspondant
             # (pris de data)
