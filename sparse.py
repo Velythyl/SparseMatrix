@@ -4,6 +4,17 @@ Matricule: 20105623
 Date: septembre 25 2015
 """
 
+import bisect
+
+
+# Pris de la documentation python officielle https://docs.python.org/2/library/bisect.html
+# 20 octobre 2018
+def binary_search(liste, j, lo, hi):     # Fais une recherche pour j dans liste entre lo et hi
+    index = bisect.bisect_left(liste, j, lo, hi)     # trouve point d'insertion de j
+    if index != len(liste) and liste[index] == j:     # Si j se trouve deja a ce point
+        return index                                # On a trouve j!
+    raise Exception                                 # On cherche les Exception generales dans les __getitem__
+
 
 # Note: j'utilise le duck typing pour verifier le type des arguments et pour verifier si l'appel de fonction est valide
 
@@ -13,14 +24,14 @@ class SparseMatrix:
     def __init__(self, fromiter, shape):
         try:
             n, m = shape
-            temp = iter(fromiter)
+            temp = iter(fromiter)  # Test si iterable
             if len(fromiter[0]) != 3:
                 raise Exception
         except Exception:
             # mauvais types de fromiter ou shape
             return
 
-        # add_ptr ajoute un intervalle a rowptr d'apres la borne exclus de l'intervalle precedent
+        # add_ptr ajoute un intervalle a rowptr apres la borne exclus de l'intervalle precedent
         def add_ptr(lower, upper):
             for counter in range(lower, upper):
                 self.rowptr.append(self.nnz)
@@ -35,7 +46,7 @@ class SparseMatrix:
 
         fromiter.sort()  # on sait que les triplets sont en ordre des rangee maintenant
 
-        last_row = fromiter[0][0]  # et le "premier" last_row est le i du premier triplet
+        last_row = fromiter[0][0]  # le "premier" last_row est le i du premier triplet
 
         add_ptr(0, last_row)  # on met des intervalles vides jusqu'au premier row non-nul
 
@@ -44,24 +55,23 @@ class SparseMatrix:
             # Donc, on ajoute triplet[1] et triplet[2] a colind et data (respectivement) peu importe la valeur
             # de triplet[0]
 
-            self.colind.append(triplet[1])  # On ajoute l'index de cet element au colind
+            self.colind.append(triplet[1])  # On ajoute l'index de cet element a colind
             self.data.append(triplet[2])  # On ajoute la valeur de l'element a data
 
             if last_row != triplet[0]:
-                # Sinon, on doit assumer qu'on change de row
+                # Sinon, on change de row
                 # On ajoute donc l'intervalle du row precendent (add_ptr)
                 # On ajoute des intervalles vides jusqu'au row present
                 # On assign le row present a last_row
-                # On assigne 1 a last_row puisque le triplet present est lui-meme une valeur non-nulle
 
-                add_ptr(last_row, triplet[0])  # On ajoute le rowptr du row precedent
+                add_ptr(last_row, triplet[0])  # On ajoute le rowptr du row precedent et les intervalles vides
 
                 last_row = triplet[0]  # On prend la valeur du nouveau row
 
-            self.nnz += 1
+            self.nnz += 1  # On a ajoute une valeur non nulle avec succes
 
-        # On n'ajoute pas l'intervalle du dernier row a rowptr: add_ptr est appele lorsqu'on change de row.
-        # Donc, on l'ajoute ici. nb_on_row est ici correct: on l'a calcule dans la boucle
+        # On n'ajoute pas l'intervalle du dernier row a rowptr: add_ptr est appele lorsqu'on change de row seulement
+        # Donc, on l'ajoute ici, ainsi que des intervalles vides jusqu'au total de n si pertinent.
         add_ptr(last_row, self.n)
 
     # Retourne l'item aux coordonnees du tuple k
@@ -73,13 +83,19 @@ class SparseMatrix:
             return None
 
         try:
-            return self.data[self.rowptr[i] + j]    # On retourne la valeur dans l'intervalle i, indice j
+            temp = self._get_pointer_interval(i)
+            lo = temp[0]  # On prend le pointer du row
+            hi = temp[1]  # On prend la grosseur de l'interalle
+
+            index = binary_search(self.colind, j, lo, hi)   # On trouve le decalage pour le j
+            return self.data[index]                      # On retourne la valeur a ce decalage dans data
+
         except Exception:
             # Le couple n'est pas dans nos valeurs non-nulles
-            if i <= self.n and j <= self.m:     # Si le couple est dans la matrice
-                return 0                        # Retourne valeur nulle
-            else:                               # Sinon
-                return None                     # valeur hors-matrice: None
+            if i <= self.n and j <= self.m:  # Si le couple est dans la matrice
+                return 0  # Retourne valeur nulle
+            else:  # Sinon
+                return None  # valeur hors-matrice: None
 
     # Retourne une matrice dense tiree de l'encodage de Yale de l'objet
     def todense(self):
@@ -88,8 +104,9 @@ class SparseMatrix:
 
         # Pour chaque rangee
         for i in range(self.n):
-            pointer = self.rowptr[i]  # On prend le pointer du row
-            nb_non_nul = self.rowptr[i + 1] - pointer  # On prend la grosseur de l'interalle
+            temp = self._get_pointer_interval(i)
+            pointer = temp[0]  # On prend le pointer du row
+            nb_non_nul = temp[1] - pointer  # On prend la grosseur de l'interalle
 
             if nb_non_nul == 0:  # Si l'intervalle est vide, on passe a la prochaine rangee
                 continue
@@ -98,6 +115,8 @@ class SparseMatrix:
             # la matrice a l'emplacement i (pris de la boucle englobante), j (pris de colind) l'item correspondant
             # (pris de data)
             #
+            # On connait le nombre de valeurs non-nulles de suite: c'est la grosseur de l'interval, nb_non_nul
+            #
             # pointer+counter: counter s'incremente nb_non_nul fois. En y ajoutant son pointeur, on retrouve l'indice
             # des j et des data correspondant
             for counter in range(nb_non_nul):
@@ -105,25 +124,128 @@ class SparseMatrix:
 
         return matrix  # retourne la matrice dense
 
-"""
-print("\n")
-sparse = SparseMatrix([(0, 1, 1), (1, 0, 2), (2, 1, 4), (2, 2, 3)], (3, 3))
-print(sparse.m)
-print(sparse.n)
-print(sparse.nnz)
-print(sparse.rowptr)
-print(sparse.colind)
-print(sparse.data)
-print(sparse.todense())
-print("\n")
-sparse = SparseMatrix([(0, 1, 1), (1, 0, 2), (2, 1, 4), (2, 2, 3)], (3, 3))
-print(sparse.m)
-print(sparse.n)
-print(sparse.nnz)
-print(sparse.rowptr)
-print(sparse.colind)
-print(sparse.data)
-print(sparse.todense())"""
+    def _get_pointer_interval(self, i):  # Retourne le pointeur sur colind et data ainsi que le nombre de valeurs
+        pointer = self.rowptr[i]  # non-nulles sur le row
+        pointer_hi = self.rowptr[i + 1]  # On prend la grosseur de l'interalle
+        return [pointer, pointer_hi]
+
+
+class SparseTensor:
+
+    def __init__(self, fromiter, shape):
+        try:
+            o, n, m = shape
+            temp = iter(fromiter)  # Test si iterable
+            if len(fromiter[0]) != 4:
+                raise Exception
+        except Exception:
+            # mauvais types de fromiter ou shape
+            return
+
+        # add_ptr ajoute un intervalle a rowptr apres la borne exclus de l'intervalle precedent
+        def add_ptr(lower, upper):
+            for counter in range(lower, upper):
+                self.rowptr.append(self.nnz)
+
+        self.n = n  # hauteur
+        self.m = m  # largeur
+        self.o = o  # profondeur
+
+        self.nnz = 0  # le nombre de valeur non-nulles = le nombre de quads, incremete dans la boucle principale
+        self.rowptr = [0]  # liste de taille n + 1 des intervalles des rangees-profondeurs
+        self.colind = []  # liste de taille nnz des indices des valeurs non-nulles
+        self.data = []  # liste de taille nnz des valeurs non-nulles
+
+        fromiter.sort()  # on sait que les quads sont en ordre des profondeurs maintenant
+
+        # Concept: les ki: ils sont l'agencement profondeur-rangee d'une valeur dans la matrice. On le calcule avec
+        # profondeur * nombre de rangees par profondeur + rangee
+        last_ki = fromiter[0][0] * self.n + fromiter[0][1]  # le "premier" last_ki est le ki du premier quad
+
+        add_ptr(0, last_ki)  # On ajoute des pointeurs vides jusqu'au premier ki non-nul
+
+        for quad in fromiter:
+            # Peu importe ce qui se passe, on sait que chaque quad n'est pas nul
+            # Donc, on ajoute quad[2] et quad[3] a colind et data (respectivement) peu importe la valeur
+            # de quad[0] et [1]
+
+            self.colind.append(quad[2])  # On ajoute l'index de cet element au colind
+            self.data.append(quad[3])  # On ajoute la valeur de l'element a data
+
+            temp_ki = quad[0] * self.n + quad[1]  # Le ki du row present
+            if last_ki != temp_ki:
+                # Si on change de ki
+                # On ajoute donc l'intervalle du row precendent (add_ptr)
+                # On ajoute des intervalles vides jusqu'au row present
+                # On assigne le row present a last_ki
+
+                add_ptr(last_ki, temp_ki)  # On ajoute le rowptr du row precedent et les intervalles nuls si besoin
+
+                last_ki = temp_ki  # On prend la valeur du nouveau row
+
+            self.nnz += 1  # On a ajoute une valeur avec succes
+            quad = None  # Liberer de la memoire
+
+        # On n'ajoute pas l'intervalle du dernier ki a rowptr: add_ptr est appele lorsqu'on change de ki.
+        # Donc, on l'ajoute ici.
+        add_ptr(last_ki, self.o * self.n + 1)
+
+    def __getitem__(self, triple):
+        try:
+            i, j, k = triple
+        except Exception:
+            # triple n'est pas un triple (donc coordonnee pas valide)
+            return None
+
+        try:
+            temp = self._get_pointer_interval(k, i)
+            lo = temp[0]  # On prend le pointer du row
+            hi = temp[1]  # On prend la grosseur de l'interalle
+
+            index = binary_search(self.colind, j, lo, hi)  # On trouve le decalage pour le j
+            return self.data[index]  # On retourne la valeur a ce decalage dans data
+
+        except Exception:
+            # Le couple n'est pas dans nos valeurs non-nulles
+            if i <= self.n and j <= self.m and k <= self.o:  # Si le couple est dans la matrice
+                return 0  # valeur nulle
+            else:  # Sinon
+                return None  # valeur hors-matrice: None
+
+    def todense(self):
+        # On cree une matrice de 0 du bon format
+        matrix3d = [[[0 for j in range(self.m)] for i in range(self.n)] for k in range(self.o)]
+
+        # Pour chaque profondeur
+        for k in range(self.o):
+            for i in range(self.n):
+                temp = self._get_pointer_interval(k, i)
+                pointer = temp[0]  # On prend le pointer du row
+                nb_non_nul = temp[1] - pointer  # On prend la grosseur de l'interalle
+
+                if nb_non_nul == 0:  # Si l'intervalle est vide, on passe a la prochaine rangee
+                    continue
+
+                # Si l'interval n'est pas vide, on parcours les points non-nuls (colind, data) du ki et on assigne dans
+                # la matrice a l'emplacement k, i (pris des boucles englobantes) j (pris de colind) l'item correspondant
+                # (pris de data)
+                #
+                # On connait le nombre de valeurs non-nulles de suite: c'est la grosseur de l'interval, nb_non_nul
+                #
+                # pointer+counter: counter s'incremente nb_non_nul fois. En y ajoutant son pointeur, on retrouve
+                # l'indice des j (colind) et des data correspondants
+                for counter in range(nb_non_nul):
+                    matrix3d[k][i][self.colind[pointer + counter]] = self.data[pointer + counter]
+
+        return matrix3d  # retourne la matrice dense
+
+    def _get_pointer_interval(self, k, i):  # Retourne le pointeur sur colind et data ainsi que le nombre de
+        pointer = self.rowptr[k * self.n + i]  # valeurs non-nulles sur ki
+        pointer_hi = self.rowptr[k * self.n + i + 1]  # On prend la grosseur de l'interalle
+        return [pointer, pointer_hi]
+
+    def get_nb_of_nb(self):
+        return len(self.rowptr) + len(self.data) + len(self.colind) + len([self.nnz, self.m, self.o, self.n])
 
 
 class VerySparseTensor:
@@ -131,15 +253,16 @@ class VerySparseTensor:
     def __init__(self, fromiter, shape):
         try:
             o, n, m = shape
-            temp = iter(fromiter)
+            temp = iter(fromiter)  # Test si iterable
             if len(fromiter[0]) != 4:
                 raise Exception
         except Exception:
             # mauvais types de fromiter ou shape
             return
 
-        nb_null_prof = 0    # Compte le nombre de profondeurs vides (decommenter dans fill_blank_prof et a la fin de
-                            # init
+        nb_null_prof = 0  # Compte le nombre de profondeurs vides (decommenter dans fill_blank_prof et a la fin de
+
+        # init
 
         # fill_blank ajoute des intervalles vides pour les rows de lower a upper, inclus-exclus
         def fill_blank(lower, upper):
@@ -151,7 +274,7 @@ class VerySparseTensor:
             for counter in range(lower, upper):
                 self.profptr.append(self.profptr[-1])
 
-                global nb_null_prof     # A decommenter pour voir le nombre de prof nulles
+                global nb_null_prof  # A decommenter pour voir le nombre de prof nulles
                 nb_null_prof += 1
 
         # add_ptr ajoute un intervalle a rowptr d'apres la borne exclus de l'intervalle precedent
@@ -192,7 +315,7 @@ class VerySparseTensor:
             self.data.append(quad[3])  # On ajoute la valeur de l'element a data
 
             if last_prof == quad[0]:
-                # Si on est sur la meme profondeurs
+                # Si on est sur la meme profondeur
 
                 if last_row == quad[1]:
                     # Et le meme row: on a une valeur de plus sur le row
@@ -203,7 +326,7 @@ class VerySparseTensor:
                     # On ajoute donc l'intervalle du row precendent (add_ptr)
                     # On ajoute des intervalles vides jusqu'au row present
                     # On assign le row present a last_row
-                    # On assigne 1 a last_row puisque le quad present est lui-meme une valeur non-nulle
+                    # On assigne 1 a nb_on_row puisque le quad present est lui-meme une valeur non-nulle
 
                     # Si on est sur la meme prof que le dernier quad:
 
@@ -219,21 +342,21 @@ class VerySparseTensor:
                 # Sinon, on change de profondeur
                 # On doit finaliser le row, puis changer de profondeur
 
-                add_ptr()  # Ajout pointeur row (qui vient d'autre prof) precedent
+                add_ptr()  # Ajout pointeur row (qui vient de l'ancienne profondeur) precedent
 
                 fill_blank(last_row + 1, self.n)  # Remplir le reste du row
 
                 last_prof = quad[0]  # Changer de profondeur
                 last_row = quad[1]  # Change de row
 
-                fill_blank(0, last_row)  # Remplir le reste du row sur la nouvelle prof.
+                fill_blank(0, last_row)  # Remplir le debut (si vide) du row sur la nouvelle prof.
 
                 add_ptr_prof()  # Ajouter le pointeur pour cette profondeur non-nulle precendente
-                fill_blank_prof(last_prof + 1, quad[0])  # Remplir les intervalles vides des profondeurs
+                fill_blank_prof(last_prof + 1, quad[0])  # Remplir les intervalles vides entre l'ancienne et la
+                # nouvelle profondeur
 
                 nb_on_row = 1  # Ce quad est une valeur non-nulle
 
-            print(quad)
             quad = None  # Liberer de la memoire
 
         # On n'ajoute pas l'intervalle du dernier row a rowptr: add_ptr est appele lorsqu'on change de row.
@@ -242,11 +365,9 @@ class VerySparseTensor:
         add_ptr_prof()
 
         # On met des intervalles vides pour les rows plus grands que le dernier row non-nul
-        # last_row est lui aussi valide, pour la meme raison que nb_on_row a l'instruction precedente.
+        # last_row et last_prof sont eux aussi valides: on les a calcules dans la boucle
         fill_blank(last_row + 1, self.n)
         fill_blank_prof(last_prof + 1, self.o)
-
-        print(nb_null_prof)     # A decommenter pour voir nb de prof nulles
 
     def __getitem__(self, triple):
         try:
@@ -255,10 +376,21 @@ class VerySparseTensor:
             # triple n'est pas un triple (donc coordonnee pas valide)
             return None
 
+        def _error():
+            # Le couple n'est pas dans nos valeurs non-nulles
+            if i <= self.n and j <= self.m and k <= self.o:  # Si le couple est dans la matrice
+                return 0  # valeur nulle
+            else:  # Sinon
+                return None  # valeur hors-matrice: None
+
         try:
-            # On retourne la valeur prise de l'intervalle de rowptr lui-meme pris de l'intervalle de profptr,
-            # a l'indice j
-            return self.data[self.rowptr[i + self.profptr[k]] + j]
+            temp = self._get_pointer_interval(k, i)
+            lo = temp[0]  # On prend le pointer du row
+            hi = temp[1]  # On prend la grosseur de l'interalle
+
+            index = binary_search(self.colind, j, lo, hi)  # On trouve le decalage pour le j
+            return self.data[index]  # On retourne la valeur a ce decalage dans data
+
         except Exception:
             # Le couple n'est pas dans nos valeurs non-nulles
             if i <= self.n and j <= self.m and k <= self.o:  # Si le couple est dans la matrice
@@ -272,153 +404,37 @@ class VerySparseTensor:
 
         # Pour chaque profondeur
         for k in range(self.o):
-            if self.profptr[k] == self.profptr[k] + 1:  # prof vide
+            if self.profptr[k] == self.profptr[k] + 1:  # si profondeur vide, on passe a la prochaine
                 continue
 
             # Profondeur pas vide
             # Pour chaque rangee
             for i in range(self.n):
-                pointer = self.rowptr[i + self.profptr[k]]  # On prend le pointer du row
-                nb_non_nul = self.rowptr[i + self.profptr[k] + 1]
-                nb_non_nul -= pointer  # On prend la grosseur de l'interalle
+                temp = self._get_pointer_interval(k, i)
+                pointer = temp[0]  # On prend le pointer du ki
+                nb_non_nul = temp[1] - pointer  # On prend la grosseur de l'interalle
 
                 if nb_non_nul == 0:  # Si l'intervalle est vide, on passe a la prochaine rangee
                     continue
 
                 # Si l'interval n'est pas vide, on parcours les points non-nuls (colind, data) du row et on assigne dans
-                # la matrice a l'emplacement i (pris de la boucle englobante), j (pris de colind) l'item correspondant
+                # la matrice a l'emplacement k,i (pris de la boucle englobante), j (pris de colind) l'item correspondant
                 # (pris de data)
                 #
-                # pointer+counter: counter s'incremente nb_non_nul fois. En y ajoutant son pointeur, on retrouve l'indice
-                # des j et des data correspondant
+                # On connait le nombre de valeurs non-nulles de suite: c'est la grosseur de l'intervalle, nb_non_nul
+                #
+                # pointer+counter: counter s'incremente nb_non_nul fois. En y ajoutant son pointeur, on retrouve
+                # l'indice des j et des data correspondant
                 for counter in range(nb_non_nul):
                     matrix3d[k][i][self.colind[pointer + counter]] = self.data[pointer + counter]
 
         return matrix3d  # retourne la matrice dense
 
-    def get_nb_of_nb(self):
-        return len(self.rowptr)+len(self.profptr)+len(self.data)+len(self.colind)+len([self.nnz, self.m, self.o, self.n])
-
-class SparseTensor:
-
-    def __init__(self, fromiter, shape):
-        try:
-            o, n, m = shape
-            temp = iter(fromiter)
-            if len(fromiter[0]) != 4:
-                raise Exception
-        except Exception:
-            # mauvais types de fromiter ou shape
-            return
-
-        # add_ptr ajoute un intervalle a rowptr d'apres la borne exclus de l'intervalle precedent
-        def add_ptr(lower, upper):
-            for counter in range(lower, upper):
-                self.rowptr.append(self.nnz)
-
-        self.n = n  # hauteur
-        self.m = m  # largeur
-        self.o = o  # profondeur
-
-        self.nnz = 0  # le nombre de valeur non-nulles = le nombre de triplets
-        self.rowptr = [0]  # liste de taille n + 1 des intervalles des colonnes
-        self.colind = []  # liste de taille nnz des indices des valeurs non-nulles
-        self.data = []  # liste de taille nnz des valeurs non-nulles
-
-        fromiter.sort()  # on sait que les quads sont en ordre des profondeurs maintenant
-
-        last_ki = fromiter[0][0]*self.n + fromiter[0][1]  # et le "premier" last_prof est le k du premier quad
-
-        add_ptr(0, last_ki)
-
-        for quad in fromiter:
-            # Peu importe ce qui se passe, on sait que chaque quad n'est pas nul
-            # Donc, on ajoute quad[2] et quad[3] a colind et data (respectivement) peu importe la valeur
-            # de quad[0] et [1]
-
-            self.colind.append(quad[2])  # On ajoute l'index de cet element au colind
-            self.data.append(quad[3])  # On ajoute la valeur de l'element a data
-
-            temp_ki = quad[0]*self.n + quad[1]
-            if last_ki != temp_ki:
-                # Si on change de k*n+i
-
-                # On ajoute donc l'intervalle du row precendent (add_ptr)
-                # On ajoute des intervalles vides jusqu'au row present
-                # On assign le row present a last_row
-                # On assigne 1 a last_row puisque le quad present est lui-meme une valeur non-nulle
-
-                # Si on est sur la meme prof que le dernier quad:
-
-                add_ptr(last_ki, temp_ki)  # On ajoute le rowptr du row precedent
-
-                last_ki = temp_ki  # On prend la valeur du nouveau row
-
-            self.nnz += 1
-            quad = None  # Liberer de la memoire
-
-        # On n'ajoute pas l'intervalle du dernier row a rowptr: add_ptr est appele lorsqu'on change de row.
-        # Donc, on l'ajoute ici. nb_on_row est ici correct: on l'a calcule dans la boucle
-        add_ptr(last_ki, self.o*self.n+1)
-        pass
-
-    def __getitem__(self, triple):
-        try:
-            i, j, k = triple
-        except Exception:
-            # triple n'est pas un triple (donc coordonnee pas valide)
-            return None
-
-        try:
-            # On retourne la valeur prise de l'intervalle de rowptr lui-meme pris de l'intervalle de profptr,
-            # a l'indice j
-            return self.data[self.rowptr[i + k*self.n] + j]
-        except Exception:
-            # Le couple n'est pas dans nos valeurs non-nulles
-            if i <= self.n and j <= self.m and k <= self.o:  # Si le couple est dans la matrice
-                return 0  # valeur nulle
-            else:  # Sinon
-                return None  # valeur hors-matrice: None
-
-    def todense(self):
-        # On cree une matrice de 0 du bon format
-        matrix3d = [[[0 for j in range(self.m)] for i in range(self.n)] for k in range(self.o)]
-
-        # Pour chaque profondeur
-        for k in range(self.o):
-            for i in range(self.n):
-                pointer = self.rowptr[k*self.n + i]  # On prend le pointer du row
-                nb_non_nul = self.rowptr[k*self.n + i + 1] - pointer  # On prend la grosseur de l'interalle
-
-                if nb_non_nul == 0:  # Si l'intervalle est vide, on passe a la prochaine rangee
-                    continue
-
-                # Si l'interval n'est pas vide, on parcours les points non-nuls (colind, data) du row et on assigne dans
-                # la matrice a l'emplacement i (pris de la boucle englobante), j (pris de colind) l'item correspondant
-                # (pris de data)
-                #
-                # pointer+counter: counter s'incremente nb_non_nul fois. En y ajoutant son pointeur, on retrouve l'indice
-                # des j et des data correspondant
-                for counter in range(nb_non_nul):
-                    matrix3d[k][i][self.colind[pointer + counter]] = self.data[pointer + counter]
-
-        return matrix3d  # retourne la matrice dense
+    def _get_pointer_interval(self, k, i):  # Retourne le pointeur sur colind et data ainsi que le nombre de
+        pointer = self.rowptr[i + self.profptr[k]]  # valeurs non-nulles sur ki
+        pointer_hi = self.rowptr[i + self.profptr[k] + 1]
+        return [pointer, pointer_hi]
 
     def get_nb_of_nb(self):
-        return len(self.rowptr)+len(self.data)+len(self.colind)+len([self.nnz, self.m, self.o, self.n])
-
-    """ # Pour chaque profondeur
-        for ik in range(self.o * self.n):
-            pointer = self.rowptr[ik]  # On prend le pointer du row
-            nb_non_nul = self.rowptr[ik + 1] - pointer  # On prend la grosseur de l'interalle
-            if nb_non_nul == 0:  # Si l'intervalle est vide, on passe a la prochaine rangee
-                continue
-            # Si l'interval n'est pas vide, on parcours les points non-nuls (colind, data) du row et on assigne dans
-            # la matrice a l'emplacement i (pris de la boucle englobante), j (pris de colind) l'item correspondant
-            # (pris de data)
-            #
-            # pointer+counter: counter s'incremente nb_non_nul fois. En y ajoutant son pointeur, on retrouve l'indice
-            # des j et des data correspondant
-            for counter in range(nb_non_nul):
-                matrix3d[ik % self.o][ik % self.n][self.colind[pointer + counter]] = self.data[pointer + counter]
-            """
+        return len(self.rowptr) + len(self.profptr) + len(self.data) + len(self.colind) + \
+               len([self.nnz, self.m, self.o, self.n])
